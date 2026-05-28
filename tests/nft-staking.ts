@@ -120,11 +120,11 @@ describe("nft-staking", () => {
     console.log("Stake NFT Tx Signature:", tx);
   });
 
-  it("Attempt to Unstake NFT before freeze period ends (should fail)", async () => {
+  it("Attempt to Claim Rewards before freeze period ends (should fail)", async () => {
     const userRewardsAta = getAssociatedTokenAddressSync(rewardsMint, provider.wallet.publicKey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
     
     try {
-      const tx = await program.methods.unstake().accountsPartial({
+      const tx = await program.methods.claimRewards().accountsPartial({
         owner: provider.wallet.publicKey,
         collection: collectionKeypair.publicKey,
         asset: NftKeypair.publicKey,
@@ -137,23 +137,23 @@ describe("nft-staking", () => {
         systemProgram: SystemProgram.programId,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       }).rpc();
-      throw new Error("Unstake succeeded before freeze period ended");
+      throw new Error("Claim rewards succeeded before freeze period ended");
     } catch (error) {
       if (error instanceof anchor.AnchorError && error.error.errorCode.code === "FreezePeriodNotOver") {
-        console.log("Expected failure when unstaking before freeze period ends:", error.message);
+        console.log("Expected failure when claiming rewards before freeze period ends:", error.message);
       } else {
         throw error;
       }
     }
   });
 
-  it("Advance time beyond freeze period and Unstake NFT!", async () => {
+  it("Advance time beyond freeze period and Claim Rewards!", async () => {
     const currentTimestamp = Date.now();
     await advanceTime({ absoluteTimestamp: currentTimestamp + (TIME_TRAVEL_IN_DAY * MILLISECONDS_IN_DAY) });
     
     const userRewardsAta = getAssociatedTokenAddressSync(rewardsMint, provider.wallet.publicKey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
     
-    const tx = await program.methods.unstake().accountsPartial({
+    const tx = await program.methods.claimRewards().accountsPartial({
       owner: provider.wallet.publicKey,
       collection: collectionKeypair.publicKey,
       asset: NftKeypair.publicKey,
@@ -166,8 +166,22 @@ describe("nft-staking", () => {
       systemProgram: SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
     }).rpc();
-    console.log("Unstake NFT Tx Signature:", tx);
-    console.log("Successfully unstaked NFT after freeze period.");
+    console.log("Claim Rewards Tx Signature:", tx);
+    console.log("Successfully claimed rewards.");
     console.log("User rewards Balance:", (await provider.connection.getTokenAccountBalance(userRewardsAta)).value.uiAmount);
+  });
+
+  it("Unstake NFT!", async () => {
+    const tx = await program.methods.unstake().accountsPartial({
+      owner: provider.wallet.publicKey,
+      collection: collectionKeypair.publicKey,
+      asset: NftKeypair.publicKey,
+      config,
+      updateAuthority,
+      mplCoreProgram: MPL_CORE_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    }).rpc();
+    console.log("Unstake NFT Tx Signature:", tx);
+    console.log("Successfully unstaked NFT.");
   });
 });
