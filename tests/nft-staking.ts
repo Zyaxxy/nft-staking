@@ -5,9 +5,10 @@ import { SystemProgram } from "@solana/web3.js";
 import { MPL_CORE_PROGRAM_ID } from "@metaplex-foundation/mpl-core";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 
-
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 const REWARDS_BPS = 10000; 
 const FREEZE_PERIOD_DAYS = 7;
+const TIME_TRAVEL_IN_DAY = 8;
 
 
 describe("nft-staking", () => {
@@ -36,7 +37,7 @@ describe("nft-staking", () => {
   )[0];
 
 
-  async function advanceTime(timestamp: number): Promise<void> {
+  async function advanceTime(params: {absoluteTimestamp?: number, absoluteSlot?: number , absoluteEpoch?: number}): Promise<void> {
     const response = await fetch(provider.connection.rpcEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -44,7 +45,7 @@ describe("nft-staking", () => {
         jsonrpc: "2.0",
         id: 1,
         method: 'surfnet_timeTravel',
-        params: [{ absoluteTimestamp: timestamp }],
+        params: [params],
       }),
     });
     const result = await response.json() as any;
@@ -147,8 +148,8 @@ describe("nft-staking", () => {
   });
 
   it("Advance time beyond freeze period and Unstake NFT!", async () => {
-    // Travel to year 2100 to ensure freeze period is surpassed
-    await advanceTime(new Date('2100-01-01').getTime());
+    const currentTimestamp = Date.now();
+    await advanceTime({ absoluteTimestamp: currentTimestamp + (TIME_TRAVEL_IN_DAY * MILLISECONDS_IN_DAY) });
     
     const userRewardsAta = getAssociatedTokenAddressSync(rewardsMint, provider.wallet.publicKey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
     
