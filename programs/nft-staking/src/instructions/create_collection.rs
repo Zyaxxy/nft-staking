@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 use mpl_core::{
     ID as MPL_CORE_PROGRAM_ID,
-    instructions::CreateCollectionV2CpiBuilder,
+    instructions::{CreateCollectionV2CpiBuilder, AddPluginV1CpiBuilder},
+    types::{Attribute, Attributes, Plugin, PluginAuthority},
 };
 
 #[derive(Accounts)]
@@ -38,6 +39,25 @@ pub fn handler(ctx: Context<CreateCollection>, name: String, uri: String) -> Res
         .system_program(&ctx.accounts.system_program.to_account_info())
         .name(name)
         .uri(uri)
+        .invoke_signed(&[signer_seeds])?;
+
+    // Add Attributes plugin to track staked NFTs in this collection
+    let attributes = Attributes {
+        attribute_list: vec![
+            Attribute {
+                key: "staked_nfts_count".to_string(),
+                value: "0".to_string(),
+            },
+        ],
+    };
+
+    AddPluginV1CpiBuilder::new(&ctx.accounts.mpl_core_program.to_account_info())
+        .collection(Some(&ctx.accounts.collection.to_account_info()))
+        .payer(&ctx.accounts.payer.to_account_info())
+        .authority(Some(&ctx.accounts.update_authority.to_account_info()))
+        .system_program(&ctx.accounts.system_program.to_account_info())
+        .plugin(Plugin::Attributes(attributes))
+        .init_authority(PluginAuthority::UpdateAuthority)
         .invoke_signed(&[signer_seeds])?;
 
     Ok(())

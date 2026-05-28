@@ -99,5 +99,45 @@ pub fn handler(ctx: Context<Stake>) -> Result<()> {
         .system_program(&ctx.accounts.system_program.to_account_info())
         .init_authority(PluginAuthority::UpdateAuthority)
         .invoke()?;
+
+    // Update collection's Attributes plugin to increment staked NFTs count
+    let collection_attributes_fetched: Option<Attributes> = fetch_plugin::<BaseCollectionV1, Attributes>(
+        &ctx.accounts.collection.to_account_info(),
+        PluginType::Attributes,
+    )
+    .ok()
+    .map(|(_,attrs,_)| attrs);
+
+    if let Some(collection_attributes) = collection_attributes_fetched {
+        let mut collection_attributes_list: Vec<Attribute> = Vec::new();
+        let mut staked_count: u64 = 0;
+
+        for attribute in &collection_attributes.attribute_list {
+            if attribute.key == "staked_nfts_count" {
+                staked_count = attribute.value.parse::<u64>()
+                    .map_err(|_| ErrorCode::InvalidTimeStamp)?;
+            } else {
+                collection_attributes_list.push(attribute.clone());
+            }
+        }
+
+        staked_count = staked_count.checked_add(1)
+            .ok_or(ErrorCode::InvalidTimeStamp)?;
+        collection_attributes_list.push(Attribute {
+            key: "staked_nfts_count".to_string(),
+            value: staked_count.to_string(),
+        });
+
+        UpdatePluginV1CpiBuilder::new(&ctx.accounts.mpl_core_program.to_account_info())
+            .collection(Some(&ctx.accounts.collection.to_account_info()))
+            .authority(Some(&ctx.accounts.update_authority.to_account_info()))
+            .payer(&ctx.accounts.owner.to_account_info())
+            .plugin(Plugin::Attributes(Attributes {
+                attribute_list: collection_attributes_list,
+            }))
+            .system_program(&ctx.accounts.system_program.to_account_info())
+            .invoke_signed(&[signer_seeds])?;
+    }
+
     Ok(())
 }       
